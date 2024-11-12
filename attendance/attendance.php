@@ -196,6 +196,45 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['submit'])) {
                         VALUES ('$student_id', '$teacher_id', '$teacher_subject', '$remarks')";
 
                 if (mysqli_query($conn, $sql)) {
+                    function sendTelegramMessage($chatId, $message) {
+                        $botToken = "7931991285:AAEq-_0-X3Xr4_gHeou5AZBs3tpSH-AvLFs"; // Replace with your bot token
+                        $url = "https://api.telegram.org/bot$botToken/sendMessage";
+                    
+                        $data = [
+                            'chat_id' => $chatId,
+                            'text' => $message,
+                        ];
+                    
+                        $options = [
+                            'http' => [
+                                'header'  => "Content-type: application/x-www-form-urlencoded\r\n",
+                                'method'  => 'POST',
+                                'content' => http_build_query($data),
+                            ],
+                        ];
+                    
+                        $context  = stream_context_create($options);
+                        $result = file_get_contents($url, false, $context);
+                        
+                        // Check if the request was successful
+                        if ($result === FALSE) {
+                            // Handle error
+                            echo "Failed to send message.";
+                        } else {
+                            // Decode the response
+                            $response = json_decode($result, true);
+                            if ($response['ok']) {
+                                echo "";
+                            } else {
+                                echo "Error: " . $response['description'];
+                            }
+                        }
+                    }
+                    
+                    // Usage
+                    $chatId = "6062189773"; // Replace with the actual user's chat ID
+                    $message = "Mahal na Magulang/Guardian, ipinapaalam namin na ang inyong anak ay present sa klase ngayong araw 🌟 Kung may mga katanungan ka, huwag mag-atubiling makipag-ugnayan. Salamat at magandang araw!😊";
+                    sendTelegramMessage($chatId, $message);
                         
                     echo '<script>
                     Swal.fire({
@@ -352,7 +391,7 @@ while ($row = mysqli_fetch_assoc($result)) {
 }
 
 // Close MySQL connection
-mysqli_close($conn);
+
 ?>
 
                     
@@ -421,61 +460,8 @@ mysqli_close($conn);
                         </tbody>
                     </table>
                 </div>
+               
 
-                <!-- <div class="container">
-                    <table class="table">
-                        <thead class="table-primary">
-                            <tr>
-                                <th colspan="2" style="text-align: center;">Class Information</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        <?php
-                       // Assuming $user_id is defined somewhere before this code snippet
-
-                     include("db_connection.php");
-
-                      // Perform query to fetch schedules along with related sections and subjects
-                      $view_query2 = "SELECT s.*, a.*, TIME_FORMAT(a.time_in, '%h:%i %p') AS time_in
-               FROM students s
-               JOIN attendance a ON s.student_id = a.student_id
-               WHERE a.teacher_id = '$teacher_id'
-               AND s.section_id = '$section_name'
-               AND s.grade_id = '$grade_name'
-               AND s.status= 'Medium Risk'
-               AND s.status= 'High Risk'";
-
-                      $result = mysqli_query($conn, $view_query2);
-
-                      if (!$result) {
-                          die("Query failed: " . mysqli_error($conn));
-                      }
-
-                      // Iterate through the results and display them
-                      while ($row = mysqli_fetch_assoc($result)) {
-                          $lname = $row['lastName'];
-                          $fname = $row['firstName'];
-                          $status = $row['status'];
-                          $action = $row['actionTake'];
-                          $result = $row['result'];
-                      ?> <tr>
-                                  
-                      <td><?php echo htmlspecialchars($fname); ?> <?php echo htmlspecialchars($lname); ?></td>
-                      <td><?php echo htmlspecialchars($status); ?></td>
-                      <td><?php echo htmlspecialchars($action); ?></td>
-                      <td><?php echo htmlspecialchars($result); ?></td>
-              </tr>
-                       <?php
-                      }
-                      ?>
-
-
-
-                           
-                         
-                        </tbody>
-                    </table>
-                </div> -->
                 
                 <!-- QR Code Scanner Modal -->
                 <div class="container">
@@ -520,6 +506,86 @@ mysqli_close($conn);
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div class="container">
+                    <table class="table">
+                        <thead class="table-primary">
+                            <tr>
+                            
+                                <th>Student Name</th>
+                                <th>Attendance Status</th>
+                                <th>Action</th>
+                                <th>Result</th>
+                           
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php
+                       // Assuming $user_id is defined somewhere before this code snippet
+
+                       include("db_connection.php");
+
+                       // Perform query to fetch schedules along with related sections and subjects
+                       $view_query2 = "SELECT s.*, a.*, COUNT(*) as attendance_count
+                        FROM students s
+                        JOIN attendance a ON s.student_id = a.student_id
+                        WHERE a.teacher_id = '$teacher_id'
+                        AND s.section_id = '$section_name'
+                        AND s.grade_id = '$grade_name'
+                      
+                        AND (s.status = 'Medium Risk' OR s.status = 'High Risk')
+                        GROUP BY s.student_id
+                        HAVING attendance_count > 1;
+
+                        ";
+ 
+                       $result = mysqli_query($conn, $view_query2);
+ 
+                       if (!$result) {
+                           die("Query failed: " . mysqli_error($conn));
+                       }
+ 
+                       // Iterate through the results and display them
+                       while ($row = mysqli_fetch_assoc($result)) {
+                           $lname = $row['lastName'];
+                           $fname = $row['firstName'];
+                           $status = $row['status'];
+                           $action = $row['actionTake'];
+                           $results = $row['result'];
+                       ?> <tr>
+                                   
+            
+                       <td><span style="font-weight: 500;"><?php echo htmlspecialchars($fname); ?> <?php echo htmlspecialchars($lname); ?></span></td>
+                      
+
+                       <?php if ($status == 'Medium Risk') : ?>
+                            <td>
+                                
+                                    <span style="color:orange;  font-weight:500"><?php echo htmlspecialchars($status); ?></span>
+                               
+                            </td>
+                            
+                        
+                        <?php else : ?>
+                            <td class='lrn-cell'>
+                            <p style="color:red;  font-weight:500"><?php echo htmlspecialchars($status); ?></p>
+                            </td>
+                        <?php endif; ?>
+
+                     
+                       <td><span style="font-weight: 500;"><?php echo htmlspecialchars($action); ?></span></td>
+                       <td><span style="font-weight: 500;"><?php echo htmlspecialchars($results); ?></span></td>
+                       
+               </tr>
+                        <?php
+                       }
+                       ?>
+
+
+
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
